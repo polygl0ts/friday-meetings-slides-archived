@@ -1,0 +1,227 @@
+\documentclass[aspectratio=169]{beamer}
+
+\usepackage{../theme/polygl0ts}
+\usepackage{drawstack}
+
+\tikzstyle{freecell}=[fill=none]
+
+\newcommand{\reg}[1]{\mintinline{asm}{#1}}
+\newcommand{\hex}[1]{\mintinline{python}{0x#1}}
+\newcommand{\naddr}[2]{\begin{tabular}{l}#1\\\hex{#2}\end{tabular}}
+\newcommand{\docl}[1]{(\textbf{\href{#1}{Documentation}})}
+
+\setbeamertemplate{navigation symbols}{}
+% \setbeameroption{show notes on second screen=left}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Title Setup
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\title{Introduction to Reverse Engineering}
+\subtitle{or: how to make everything open source}
+\author{therokdaba}
+\date{\today}
+
+\begin{document}
+\titleframe
+
+% \tocframe
+
+\begin{frame}
+    \frametitle{What's rev?}
+    
+    \begin{itemize}
+        % \note{note text} % TODO fix notes
+        \pause
+        \item Stands for reverse engineering
+        \pause
+        \item You have a binary, no source code and you want to do understand what it does
+        \pause
+        \item For example:
+            \begin{itemize} % TODO maybe improve the examples
+                \pause
+                \item Bypassing license checks, DRM, etc.
+                \pause
+                \item Vulnerability research
+                \pause
+                \item Malware analysis
+                \pause
+                \item ... and CTFs!
+            \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \frametitle{What are rev challenges?} 
+    
+    \begin{itemize}
+        \item You get a binary (sometimes stripped, no symbols)
+        \pause
+        \item It contains the flag (or a way to get it)
+        \pause
+        \begin{itemize}
+            \item Sometimes it checks if the input is the flag
+            \pause
+            \item Sometimes it encrypts the flag 
+            \pause
+            \item Sometimes you need to solve something else to get the flag % TODO rephrase 
+        \end{itemize}
+        \pause
+        \item Understand the logic of the binary to get the flag
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \frametitle{What are rev techniques?}
+    \begin{itemize}
+        \pause
+        \item Static analysis (looking at the binary without running it)
+        \pause
+        \item Dynamic analysis (running the binary and observing its behavior, uses a debugger and things like code patching)
+        \pause
+        \item Best: both!
+    \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+    \frametitle{What's a binary?}
+    \pause
+    \texttt{Binary files are the compiled version of source code}\\
+    \pause
+    More precisely:
+    \begin{codebox}{objdump-nasm}
+\$ file /bin/ls
+/bin/ls: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), 
+dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, 
+BuildID[sha1]=baba64ae8c7edfd5d7c2b72b425d45ab72a46785, 
+for GNU/Linux 4.4.0, stripped
+    \end{codebox}
+\pause
+    \begin{codebox}{objdump-nasm}
+\$ hexdump -C /bin/ls | head -n 5
+00000000  7f 45 4c 46 02 01 01 00  00 00 00 00 00 00 00 00  |.ELF............|
+00000010  03 00 3e 00 01 00 00 00  30 51 00 00 00 00 00 00  |..>.....0Q......|
+00000020  40 00 00 00 00 00 00 00  c0 13 02 00 00 00 00 00  |@...............|
+00000030  00 00 00 00 40 00 38 00  0d 00 40 00 1c 00 1b 00  |....@.8...@.....|
+00000040  06 00 00 00 04 00 00 00  40 00 00 00 00 00 00 00  |........@.......|
+    \end{codebox}
+\end{frame}
+
+\begin{frame}
+    \frametitle{What's an ELF?}
+    \pause
+    \texttt{UNIX file format}
+    \begin{itemize}
+        \pause
+        \item entry point
+        \pause
+        \item segments (map ELF file → RAM)
+        \pause
+        \item sections (map segments to sections)
+        \pause
+        \item dynamic linking (load more ELFs)
+        \begin{itemize}
+            \item libc in particular!
+        \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+    \frametitle{Where does it start?}
+    \texttt{\$ readelf -h /bin/ls}
+    \begin{codebox}{objdump-nasm}
+ELF Header:
+  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00 
+  Class:                             ELF64
+  Data:                              2's complement, little endian
+  Version:                           1 (current)
+  OS/ABI:                            UNIX - System V
+  ABI Version:                       0
+  Type:                              DYN (Position-Independent Executable file)
+  Machine:                           Advanced Micro Devices X86-64
+  Version:                           0x1
+  Entry point address:               0x5130
+  Start of program headers:          64 (bytes into file)
+  Start of section headers:          136128 (bytes into file)
+  Flags:                             0x0
+  Size of this header:               64 (bytes)
+  ...
+    \end{codebox}
+\end{frame}
+
+\begin{frame}[fragile]
+    \frametitle{What runs?}
+    \begin{codebox}{asm}
+\$ objdump -Mintel -d /bin/ls
+endbr64
+xor    ebp,ebp
+mov    r9,rdx
+pop    rsi
+mov    rdx,rsp
+and    rsp,0xfffffffffffffff0
+push   rax
+push   rsp
+xor    r8d,r8d
+xor    ecx,ecx
+lea    rdi,[rip+0xffffffffffffdf31]
+call   QWORD PTR [rip+0x1cb3b] # 21c90 <__libc_start_main@GLIBC_2.34>
+    \end{codebox}
+\end{frame}
+
+\begin{frame}[fragile]
+    \frametitle{Tools}
+        \begin{itemize}
+            \pause
+            \item \texttt{file} to figure out what kind of binary it is
+            \pause
+            \item \texttt{strings} to get printable strings from the binary
+            \pause
+            \item \texttt{ltrace}/\texttt{strace} to trace library/syscalls
+            \pause
+            \item \texttt{gdb} for dynamic analysis
+            \pause
+            \begin{itemize}
+                \item \href{https://github.com/hugsy/gef}{GEF}
+                \item \href{https://pwndbg.re/}{pwndbg}
+                \item \href{https://github.com/longld/peda}{PEDA}
+            \end{itemize}
+            \pause
+            \item \texttt{objdump}/\texttt{readelf} for static analysis
+            \pause
+            \item IDA Pro, Ghidra, radare2, Binary Ninja for disassembly/decompilation
+            \pause
+            \item \texttt{pwntools} for exploit development
+        \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+    \frametitle{decompilation}
+    \texttt{go from disassembly to "source code"} 
+    \pause
+    \begin{codebox}{c}
+void processEntry entry(undefined8 param_1,undefined8 param_2){
+  undefined auStack_8 [8];
+  
+  __libc_start_main(FUN_20,param_2,&stack8,0,0,param_1,auStack_8);
+  do {
+    /* WARNING: Do nothing block with infinite loop */
+  } while( true );
+}
+    \end{codebox}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Ghidra}
+    \begin{itemize}
+        \item \href{https://ghidra-sre.org/}{https://ghidra-sre.org/}
+        \item Developed by the NSA.open source, free
+        \item There are other tools like 
+        \begin{itemize}
+            \item \href{https://hex-rays.com/ida-free}{IDA (Free)}
+            \item \href{https://binary.ninja/}{Binary Ninja}
+            \item \href{https://github.com/radareorg/radare2}{radare2} 
+            \item \href{https://cutter.re/cutter-2.0}{Cutter (GUI for radare2)}
+        \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\end{document}
