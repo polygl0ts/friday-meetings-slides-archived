@@ -1,4 +1,4 @@
-Archived and moved to https://github.com/polygl0ts/friday-meetings-slides .
+Archived and moved to https://github.com/polygl0ts/slides .
 
 ---------------
 
