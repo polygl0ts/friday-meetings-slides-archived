@@ -1,3 +1,6 @@
+Archived and moved to https://github.com/polygl0ts/friday-meetings-slides .
+
+---------------
 
 OKAY boys this is the ultra mega repo for all the slides for the fridays-meetings.
 
